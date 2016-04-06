@@ -168,6 +168,26 @@ produceMessage (KafkaTopic topicPtr _ _) partition (KafkaProduceMessage payload)
 
 produceMessage _ _ (KafkaProduceKeyedMessage _ _) = undefined
 
+-- | Synchronously produce a message.
+-- This waits to return until the message is committed to Kafka.
+produceMessageSync :: KafkaTopic
+                   -> KafkaProducePartition
+                   -> KafkaProduceMessage
+                   -> IO (Maybe KafkaError)
+produceMessageSync
+    (KafkaTopic topicPtr _ _)
+    partition
+    (KafkaProduceMessage payload) = do
+    let (payloadFPtr, payloadOffset, payloadLength) = BSI.toForeignPtr payload
+
+    withForeignPtr payloadFPtr $ \payloadPtr -> do
+        let passedPayload = payloadPtr `plusPtr` payloadOffset
+
+        handleProduceErr =<<
+          rdKafkaProduce topicPtr (producePartitionInteger partition)
+            0 passedPayload (fromIntegral payloadLength)
+            nullPtr (CSize 0) nullPtr
+
 -- | Produce a single keyed message. Since librdkafka is backed by a queue, this function can return
 -- before messages are sent. See 'drainOutQueue' to wait for a queue to be empty
 produceKeyedMessage :: KafkaTopic -- ^ topic pointer

@@ -731,7 +731,7 @@ rdKafkaConsumeStop topicPtr partition = do
 
 {#fun unsafe rd_kafka_produce as ^
     {`RdKafkaTopicTPtr', cIntConv `CInt32T', `Int', castPtr `Word8Ptr',
-     cIntConv `CSize', castPtr `Word8Ptr', cIntConv `CSize', castPtr `Word8Ptr'}
+     cIntConv `CSize', castPtr `Word8Ptr', cIntConv `CSize', castPtr `Ptr Int'}
      -> `Int' #}
 
 {#fun unsafe rd_kafka_produce_batch as ^
