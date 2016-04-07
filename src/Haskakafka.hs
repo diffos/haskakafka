@@ -5,6 +5,7 @@ module Haskakafka
 , consumeMessageBatch
 , withKafkaProducer
 , produceMessage
+, produceMessageSync
 , produceKeyedMessage
 , produceMessageBatch
 , storeOffset
@@ -165,28 +166,41 @@ produceMessage (KafkaTopic topicPtr _ _) partition (KafkaProduceMessage payload)
           rdKafkaProduce topicPtr (producePartitionInteger partition)
             copyMsgFlags passedPayload (fromIntegral payloadLength)
             nullPtr (CSize 0) nullPtr
-
 produceMessage _ _ (KafkaProduceKeyedMessage _ _) = undefined
 
 -- | Synchronously produce a message.
 -- This waits to return until the message is committed to Kafka.
-produceMessageSync :: KafkaTopic
+-- Implemented via https://github.com/edenhill/librdkafka/wiki/Sync-producer
+produceMessageSync :: Kafka
+                   -> KafkaTopic
                    -> KafkaProducePartition
                    -> KafkaProduceMessage
                    -> IO (Maybe KafkaError)
-produceMessageSync
-    (KafkaTopic topicPtr _ _)
-    partition
-    (KafkaProduceMessage payload) = do
+produceMessageSync kafka (KafkaTopic topicPtr _ _) partition
+    (KafkaProduceMessage payload) = alloca $ \intPtr -> do
+    let waitConstant = (-12345)
+    poke intPtr waitConstant
     let (payloadFPtr, payloadOffset, payloadLength) = BSI.toForeignPtr payload
+        waitSync = do
+          pollEvents kafka 100
+          n <- peek intPtr
+          if n == waitConstant
+          then waitSync
+          else return Nothing
 
     withForeignPtr payloadFPtr $ \payloadPtr -> do
         let passedPayload = payloadPtr `plusPtr` payloadOffset
 
-        handleProduceErr =<<
+        maybeErr <- handleProduceErr =<<
           rdKafkaProduce topicPtr (producePartitionInteger partition)
             0 passedPayload (fromIntegral payloadLength)
-            nullPtr (CSize 0) nullPtr
+            nullPtr (CSize 0) intPtr
+
+        case maybeErr of
+          Just err -> return $ Just err
+          Nothing  -> waitSync
+
+produceMessageSync _ _ _ (KafkaProduceKeyedMessage _ _) = undefined
 
 -- | Produce a single keyed message. Since librdkafka is backed by a queue, this function can return
 -- before messages are sent. See 'drainOutQueue' to wait for a queue to be empty
