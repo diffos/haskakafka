@@ -518,7 +518,7 @@ newRdKafkaQueue k = do
     -> `RdKafkaRespErrT' cIntToEnum #}
 
 {#fun unsafe rd_kafka_position as ^
-    {`RdKafkaTPtr', `RdKafkaTopicPartitionListTPtr', `Int'}
+    {`RdKafkaTPtr', `RdKafkaTopicPartitionListTPtr'}
     -> `RdKafkaRespErrT' cIntToEnum #}
 -------------------------------------------------------------------------------------------------
 ---- Groups
